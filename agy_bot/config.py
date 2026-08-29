@@ -86,13 +86,34 @@ class Config:
         }
     )
 
+    def add_allowed_user(self, user_id: int) -> None:
+        """Add user ID to allowed list and persist to .env file."""
+        self.allowed_user_ids.add(user_id)
+        env_path = Path(self.default_working_dir) / ".env"
+        ids_str = ",".join(str(i) for i in sorted(self.allowed_user_ids))
+        
+        if env_path.exists():
+            try:
+                content = env_path.read_text(encoding="utf-8")
+                if "ALLOWED_USER_IDS=" in content:
+                    lines = []
+                    for line in content.splitlines():
+                        if line.startswith("ALLOWED_USER_IDS="):
+                            lines.append(f'ALLOWED_USER_IDS="{ids_str}"')
+                        else:
+                            lines.append(line)
+                    env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                else:
+                    with open(env_path, "a", encoding="utf-8") as f:
+                        f.write(f'\nALLOWED_USER_IDS="{ids_str}"\n')
+            except Exception as e:
+                pass
+
     def validate(self) -> list[str]:
         """Validate critical configuration settings and return list of errors."""
         errors: list[str] = []
         if not self.telegram_bot_token:
             errors.append("TELEGRAM_BOT_TOKEN is not set in environment or .env file.")
-        if not self.allowed_user_ids:
-            errors.append("ALLOWED_USER_IDS is empty! Set at least one Telegram user ID for security.")
         if not os.path.exists(self.agy_bin):
             errors.append(f"agy executable not found at '{self.agy_bin}'. Please install agy or set AGY_BIN.")
         return errors
@@ -100,3 +121,4 @@ class Config:
 
 # Global default configuration instance
 config = Config()
+

@@ -27,9 +27,27 @@ def is_authorized(user_id: int) -> bool:
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /start command."""
     user = update.effective_user
-    if not user or not is_authorized(user.id):
+    if not user:
+        return
+
+    # Auto-pair first user if no allowed IDs configured yet
+    if not config.allowed_user_ids:
+        config.add_allowed_user(user.id)
+        logger.info("Automatically paired primary user ID %s (%s)", user.id, user.username or user.first_name)
         if update.message:
-            await update.message.reply_text("⛔ <b>Unauthorized.</b> Your Telegram ID is not on the whitelist.", parse_mode="HTML")
+            await update.message.reply_text(
+                f"🎉 <b>Authentication Paired!</b>\n"
+                f"Your Telegram User ID (<code>{user.id}</code>) has been whitelisted as the primary administrator.\n",
+                parse_mode="HTML",
+            )
+
+    elif not is_authorized(user.id):
+        if update.message:
+            await update.message.reply_text(
+                f"⛔ <b>Unauthorized.</b> Your Telegram ID is <code>{user.id}</code>.\n"
+                f"Add this ID to <code>ALLOWED_USER_IDS</code> in your <code>.env</code> file to authorize.",
+                parse_mode="HTML",
+            )
         return
 
     session = session_manager.get_session(user.id)
