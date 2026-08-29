@@ -1,0 +1,17 @@
+[Unit]
+Description=Antigravity (agy) Telegram Bot Bridge Service
+After=network.target
+
+[Service]
+Type=simple
+User=pete
+WorkingDirectory=/home/pete/share/code/agy_bot
+EnvironmentFile=/home/pete/share/code/agy_bot/.env
+ExecStart=/home/pete/miniforge3/bin/python /home/pete/share/code/agy_bot/main.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
