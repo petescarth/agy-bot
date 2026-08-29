@@ -34,6 +34,8 @@ class UserSession:
     effort: str = field(default_factory=lambda: config.default_effort)
     mode: str = field(default_factory=lambda: config.default_mode)
     auto_approve: bool = field(default_factory=lambda: config.default_auto_approve)
+    recent_workspaces: List[str] = field(default_factory=list)
+    bookmarked_workspaces: List[str] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     last_active: str = field(default_factory=lambda: datetime.now().isoformat())
 
@@ -86,9 +88,73 @@ class SessionManager:
             return False, f"Path '{expanded}' is not a directory."
 
         session.working_dir = expanded
+        if expanded not in session.recent_workspaces:
+            session.recent_workspaces.insert(0, expanded)
+            session.recent_workspaces = session.recent_workspaces[:10]
+        else:
+            session.recent_workspaces.remove(expanded)
+            session.recent_workspaces.insert(0, expanded)
+
         session.last_active = datetime.now().isoformat()
         self._save_state()
         return True, expanded
+
+    def add_bookmark(self, user_id: int, path: str) -> tuple[bool, str]:
+        """Add a directory to user's bookmarked workspaces."""
+        session = self.get_session(user_id)
+        expanded = os.path.abspath(os.path.expanduser(path))
+        if not os.path.exists(expanded) or not os.path.isdir(expanded):
+            return False, f"Directory '{expanded}' does not exist."
+        if expanded not in session.bookmarked_workspaces:
+            session.bookmarked_workspaces.append(expanded)
+            self._save_state()
+        return True, expanded
+
+    def get_available_workspaces(self, user_id: int) -> List[str]:
+        """Discover available, recent, bookmarked, and sibling workspace directories."""
+        session = self.get_session(user_id)
+        workspaces_set: list[str] = []
+
+        def add_if_valid(p: str):
+            p_abs = os.path.abspath(os.path.expanduser(p))
+            if os.path.isdir(p_abs) and p_abs not in workspaces_set:
+                workspaces_set.append(p_abs)
+
+        # 1. Current working dir
+        add_if_valid(session.working_dir)
+
+        # 2. Bookmarked
+        for b in session.bookmarked_workspaces:
+            add_if_valid(b)
+
+        # 3. Recent
+        for r in session.recent_workspaces:
+            add_if_valid(r)
+
+        # 4. Default configured
+        add_if_valid(config.default_working_dir)
+
+        # 5. Sibling project folders in parent of cwd
+        try:
+            parent = Path(session.working_dir).parent
+            if parent.exists() and parent.is_dir():
+                for sub in parent.iterdir():
+                    if sub.is_dir() and not sub.name.startswith("."):
+                        add_if_valid(str(sub))
+        except Exception:
+            pass
+
+        # 6. Check common code dirs (e.g. /home/pete/share/code)
+        try:
+            common_code = Path("/home/pete/share/code")
+            if common_code.exists() and common_code.is_dir():
+                for sub in common_code.iterdir():
+                    if sub.is_dir() and not sub.name.startswith("."):
+                        add_if_valid(str(sub))
+        except Exception:
+            pass
+
+        return workspaces_set
 
     def set_model(self, user_id: int, model_name: str) -> bool:
         """Set active LLM model."""
@@ -204,6 +270,8 @@ class SessionManager:
                         effort=sdata.get("effort", config.default_effort),
                         mode=sdata.get("mode", config.default_mode),
                         auto_approve=sdata.get("auto_approve", config.default_auto_approve),
+                        recent_workspaces=sdata.get("recent_workspaces", []),
+                        bookmarked_workspaces=sdata.get("bookmarked_workspaces", []),
                         created_at=sdata.get("created_at", datetime.now().isoformat()),
                         last_active=sdata.get("last_active", datetime.now().isoformat()),
                     )
@@ -224,6 +292,8 @@ class SessionManager:
                     "effort": sess.effort,
                     "mode": sess.mode,
                     "auto_approve": sess.auto_approve,
+                    "recent_workspaces": sess.recent_workspaces,
+                    "bookmarked_workspaces": sess.bookmarked_workspaces,
                     "created_at": sess.created_at,
                     "last_active": sess.last_active,
                 }

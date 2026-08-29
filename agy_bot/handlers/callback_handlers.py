@@ -167,8 +167,55 @@ async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TY
             parse_mode="HTML",
         )
 
+    # 13. Workspace menu
+    elif data == "menu_workspaces":
+        await query.answer()
+        await _show_workspaces_menu(query, user.id)
+
+    # 14. Set workspace
+    elif data.startswith("set_ws:"):
+        idx = int(data.split(":", 1)[1])
+        avail = session_manager.get_available_workspaces(user.id)
+        if 0 <= idx < len(avail):
+            target_path = avail[idx]
+            ok, res = session_manager.set_working_dir(user.id, target_path)
+            if ok:
+                await query.answer(f"Workspace set to {Path(res).name}!")
+            else:
+                await query.answer(f"Error: {res}", show_alert=True)
+        await _show_status_view(query, user.id)
+
     else:
         await query.answer()
+
+
+async def _show_workspaces_menu(query, user_id: int) -> None:
+    """Render interactive workspace selection menu."""
+    session = session_manager.get_session(user_id)
+    workspaces = session_manager.get_available_workspaces(user_id)
+
+    buttons = []
+    for i, ws in enumerate(workspaces[:12]):
+        folder_name = Path(ws).name or ws
+        is_active = (ws == session.working_dir)
+        check = "✓ " if is_active else ""
+        btn_text = f"{check}📁 {folder_name}"
+        buttons.append([InlineKeyboardButton(btn_text, callback_data=f"set_ws:{i}")])
+
+    buttons.append([InlineKeyboardButton("🔙 Back to Status", callback_data="show_status")])
+
+    text = (
+        "📁 <b>Select Workspace Directory</b>\n\n"
+        f"<b>Current:</b> <code>{escape_html(session.working_dir)}</code>\n\n"
+        "Tap a detected project or directory to switch to it:\n"
+        "<i>(Or use <code>/cd /path/to/project</code> for any custom path)</i>"
+    )
+
+    await query.edit_message_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(buttons),
+        parse_mode="HTML",
+    )
 
 
 async def _show_status_view(query, user_id: int) -> None:
@@ -197,16 +244,19 @@ async def _show_status_view(query, user_id: int) -> None:
 
     buttons = [
         [
+            InlineKeyboardButton("📁 Change Workspace", callback_data="menu_workspaces"),
             InlineKeyboardButton("🤖 Change Model", callback_data="menu_models"),
+        ],
+        [
             InlineKeyboardButton("🧠 Reasoning Effort", callback_data="menu_effort"),
-        ],
-        [
             InlineKeyboardButton("🎯 Execution Mode", callback_data="menu_mode"),
-            InlineKeyboardButton("🛡️ Toggle Auto-Approve", callback_data="toggle_perms"),
         ],
         [
+            InlineKeyboardButton("🛡️ Toggle Auto-Approve", callback_data="toggle_perms"),
             InlineKeyboardButton("✨ New Conversation", callback_data="reset_conv"),
-            InlineKeyboardButton("📜 Browse Sessions", callback_data="page_conv:0"),
+        ],
+        [
+            InlineKeyboardButton("📜 Browse Saved Sessions", callback_data="page_conv:0"),
         ],
     ]
 

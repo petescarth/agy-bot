@@ -254,6 +254,40 @@ async def resume_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         )
 
 
+async def workspace_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /workspace or /workspaces command to show interactive workspace switcher."""
+    user = update.effective_user
+    if not user or not is_authorized(user.id):
+        return
+
+    session = session_manager.get_session(user.id)
+    workspaces = session_manager.get_available_workspaces(user.id)
+
+    buttons = []
+    for i, ws in enumerate(workspaces[:12]):
+        folder_name = Path(ws).name or ws
+        is_active = (ws == session.working_dir)
+        check = "✓ " if is_active else ""
+        btn_text = f"{check}📁 {folder_name}"
+        buttons.append([InlineKeyboardButton(btn_text, callback_data=f"set_ws:{i}")])
+
+    buttons.append([InlineKeyboardButton("🔙 Dashboard", callback_data="show_status")])
+
+    text = (
+        "📁 <b>Workspace Switcher</b>\n\n"
+        f"<b>Current Active Workspace:</b>\n<code>{escape_html(session.working_dir)}</code>\n\n"
+        "Tap a detected project below to switch your working directory:\n"
+        "<i>(Or send <code>/cd &lt;path&gt;</code> for any custom path)</i>"
+    )
+
+    if update.message:
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(buttons),
+            parse_mode="HTML",
+        )
+
+
 async def cd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /cd <path> command."""
     user = update.effective_user
@@ -261,17 +295,11 @@ async def cd_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if not context.args:
-        session = session_manager.get_session(user.id)
-        if update.message:
-            await update.message.reply_text(
-                f"📁 <b>Current Directory:</b> <code>{escape_html(session.working_dir)}</code>\n\n"
-                "Usage: <code>/cd /path/to/project</code>",
-                parse_mode="HTML",
-            )
+        # Delegate to interactive workspace picker
+        await workspace_cmd(update, context)
         return
 
     target_path = " ".join(context.args)
-    # Handle relative paths based on current user session cwd
     session = session_manager.get_session(user.id)
     if not os.path.isabs(os.path.expanduser(target_path)):
         target_path = os.path.join(session.working_dir, target_path)

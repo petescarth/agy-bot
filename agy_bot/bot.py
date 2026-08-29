@@ -33,6 +33,7 @@ from agy_bot.handlers.command_handlers import (
     start_cmd,
     status_cmd,
     stop_cmd,
+    workspace_cmd,
 )
 from agy_bot.handlers.message_handlers import (
     handle_document_message,
@@ -48,6 +49,7 @@ async def post_init_setup(app: Application) -> None:
     commands = [
         BotCommand("start", "Start bot & view overview"),
         BotCommand("status", "View control dashboard & stats"),
+        BotCommand("workspace", "Switch or browse workspaces"),
         BotCommand("new", "Start a fresh conversation"),
         BotCommand("sessions", "Browse & resume past sessions"),
         BotCommand("model", "Change AI model"),
@@ -86,6 +88,8 @@ def create_application() -> Application:
     app.add_handler(CommandHandler("start", start_cmd))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("status", status_cmd))
+    app.add_handler(CommandHandler("workspace", workspace_cmd))
+    app.add_handler(CommandHandler("workspaces", workspace_cmd))
     app.add_handler(CommandHandler("new", new_cmd))
     app.add_handler(CommandHandler("clear", new_cmd))
     app.add_handler(CommandHandler("sessions", sessions_cmd))
