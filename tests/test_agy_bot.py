@@ -107,6 +107,20 @@ class TestSessionManager(unittest.TestCase):
         ok_fail, res_fail = self.mgr.set_working_dir(user_id, "/non/existent/path/xyz")
         self.assertFalse(ok_fail)
 
+    def test_available_workspaces(self):
+        user_id = 5678
+        subfolder = os.path.join(self.temp_dir, "my_project")
+        os.makedirs(subfolder, exist_ok=True)
+
+        self.mgr.set_working_dir(user_id, subfolder)
+        avail = self.mgr.get_available_workspaces(user_id)
+        self.assertIn(subfolder, avail)
+
+        # Test bookmark
+        ok, b_path = self.mgr.add_bookmark(user_id, self.temp_dir)
+        self.assertTrue(ok)
+        self.assertIn(self.temp_dir, self.mgr.get_session(user_id).bookmarked_workspaces)
+
 
 class TestAgyClient(unittest.TestCase):
     def test_build_command_args(self):
